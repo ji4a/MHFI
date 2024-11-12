@@ -4,8 +4,7 @@
 
 #!/bin/bash
 
-TELEGRAM_BOT_TOKEN="6622629795:AAG4jQGxCF3EFzuZgAz5YO034_LunPvQMRU"
-CHAT_ID="1830769097"
+source tokens.sh
 
 send_message() {
     local text="$1"
@@ -70,7 +69,7 @@ service firewalld restart
 
 ####### SET HOSTNAME #######
 SERVER_IP=$(hostname -I | awk '{print $1}')
-sudo hostnamectl set-hostname wrk.mhbt.nl
+sudo hostnamectl set-hostname ${SERVER_IP}.myworld.com
 sudo systemctl restart systemd-hostnamed
 
 ((COMPLETED_STEPS++))
@@ -83,7 +82,7 @@ send_progress_message "$((COMPLETED_STEPS * 100 / TOTAL_STEPS))"
 sudo dnf groupinstall "server with GUI" -y
 sudo dnf install tigervnc-server -y
 
-mkdir ~/.vnc/
+mkdir -p ~/.vnc/
 
 content=$(cat <<END
 session=gnome
@@ -95,57 +94,57 @@ END
 
 echo "$content" > ~/.vnc/config
 
+# Configure the firewall to allow VNC
 sudo firewall-cmd --add-service=vnc-server --permanent
 sudo firewall-cmd --reload
 
-adduser mhbt
+# Create a new user 'admin' with a predefined password
+sudo adduser admin
+echo "admin:Money22" | sudo chpasswd  # Set the password for 'admin'
 
-su -l mhbt <<'EOF'
+# Grant the 'admin' user passwordless sudo access for specific commands
+echo "admin ALL=(ALL) NOPASSWD: ALL" | sudo tee /etc/sudoers.d/admin_no_password
+sudo chmod 440 /etc/sudoers.d/admin_no_password
+sudo visudo -c  # Check syntax of sudoers files
 
-cat > set_vnc_password.exp << EXP_EOF
-#!/usr/bin/expect
-spawn vncpasswd
-expect "Password:"
-send "Money22\r"
-expect "Verify:"
-send "Money22\r"
-expect "Would you like to enter a view-only password (y/n)?"
-send "N\r"
-expect eof
-EXP_EOF
+# Switch to the 'admin' user environment to configure VNC
+sudo -i -u admin bash <<'EOF'
 
-chmod +x set_vnc_password.exp
-./set_vnc_password.exp
+# Ensure .vnc directory exists
+mkdir -p ~/.vnc
 
+# Set the VNC password directly
+echo "Money22" | vncpasswd -f > ~/.vnc/passwd
+chmod 600 ~/.vnc/passwd
+
+# Start the VNC server with specified geometry
 vncserver :1 -geometry 1280x800
 
-cat <<EOF | sudo tee /etc/systemd/system/vncserver.service >/dev/null
+# Create a systemd service for the VNC server
+cat <<SERVICE_EOF | sudo tee /etc/systemd/system/vncserver@:1.service >/dev/null
 [Unit]
 Description=VNC Server
 After=network.target
 
 [Service]
 Type=forking
-User=mhbt
+User=admin
 ExecStart=/usr/bin/vncserver :1 -geometry 1280x800
 ExecStop=/usr/bin/vncserver -kill :1
 
 [Install]
 WantedBy=multi-user.target
+SERVICE_EOF
+
+####### Enable VNC to start on reboot #######
+sudo systemctl daemon-reload
+sudo systemctl enable vncserver@:1.service
+
 EOF
 
-####### START VNC EVERY TIME ON REBOOT #######
-rc_local_command='su - mhbt -c "vncserver :1 -geometry 1280x800"'
-echo -e "$rc_local_command" >> /etc/rc.d/rc.local
-chmod +x /etc/rc.d/rc.local
-
-systemctl daemon-reload
-
-systemctl enable rc-local.service
-systemctl start rc-local.service
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now vncserver.service
+sudo systemctl enable --now vncserver@:1.service
 
 ################################################################################################################################################
 #### SELINUX SSHD #### ----------------------------------------------------------------------------------------------------------------- #######
@@ -197,6 +196,9 @@ sudo dnf install sublime-text -y
 ###### LIBRE OFFICE ######
 yum install -y libreoffice
 
+###### GOOGLE CHROME ######
+sudo dnf install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+
 ###### VSCODE ######
 sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc
 sudo sh -c 'echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/vscode.repo'
@@ -221,4 +223,4 @@ bash v_cp.sh
 
 rm -rf /root/vnc
 rm -rf /root/StackScript
-rm -rf /home/mhbt/set_vnc_password.exp
+rm -rf /home/admin/set_vnc_password.exp
