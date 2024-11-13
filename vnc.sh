@@ -196,6 +196,9 @@ sudo dnf install sublime-text -y
 ###### LIBRE OFFICE ######
 yum install -y libreoffice
 
+###### GEANY ######
+sudo dnf install geany -y
+
 ###### GOOGLE CHROME ######
 sudo dnf install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
 
