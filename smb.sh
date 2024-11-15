@@ -4,16 +4,18 @@
 
 dnf install -y samba samba-client
 
-mkdir /SERVER
-chmod -R 777 /SERVER
+FOLDER="SERVER"
 
-echo "[SERVER]
-   path = /SERVER
+mkdir /$FOLDER
+chmod -R 777 /$FOLDER
+
+echo "[$FOLDER]
+   path = /$FOLDER
    writable = yes
    guest ok = no
    create mask = 0777
    directory mask = 0777
-   valid users = @MHBT_GROUP" >> /etc/samba/smb.conf
+      valid users = @MHBT_GROUP" >> /etc/samba/smb.conf
 
 systemctl restart smb
 
@@ -23,7 +25,7 @@ systemctl start smb
 firewall-cmd --permanent --add-service=samba
 firewall-cmd --reload
 
-echo "File server setup completed. SERVER folder is shared via SMB."
+echo "File server setup completed. $FOLDER folder is shared via SMB."
 
 
 # ADD USER and give SMB ACCESS
@@ -36,8 +38,8 @@ echo -e "$PASSWORD\n$PASSWORD" | passwd $USERNAME
 
 (echo "$PASSWORD"; echo "$PASSWORD") | smbpasswd -a $USERNAME
 
-chown -R $USERNAME:$USERNAME /SERVER
-chmod -R 755 /SERVER
+chown -R $USERNAME:$USERNAME /$FOLDER
+chmod -R 755 /$FOLDER
 
 echo "User $USERNAME created and set up for sharing the folder."
 
@@ -45,14 +47,14 @@ echo "User $USERNAME created and set up for sharing the folder."
 # CREATE THE MHBT_GROUP AND SET PERMISSIONS FOR THE SHARED FOLDER
 groupadd MHBT_GROUP
 
-chown :MHBT_GROUP /SERVER
-chmod g+rw /SERVER
+chown :MHBT_GROUP /$FOLDER
+chmod g+rw /$FOLDER
 
 # ADD USERS TO GROUP
 usermod -aG MHBT_GROUP admin
 usermod -aG MHBT_GROUP roy
 
-echo "GROUP created and users added to the group with read and write permissions on /SERVER folder."
+echo "GROUP created and users added to the group with read and write permissions on /$FOLDER folder."
 
 sudo systemctl restart smb
 
